@@ -1,0 +1,18 @@
+ks103_ultrasound:
+  ros__parameters:
+    i2c_device: /dev/i2c-1
+    sensors.left_front.address: 116
+    sensors.left_front.frame_id: ultrasound_left_front
+    sensors.right_front.address: 117
+    sensors.right_front.frame_id: ultrasound_right_front
+    sensors.left_rear.address: 118
+    sensors.left_rear.frame_id: ultrasound_left_rear
+    sensors.right_rear.address: 119
+    sensors.right_rear.frame_id: ultrasound_right_rear
+    firing_order: [left_front, right_front, left_rear, right_rear]
+    measurement_timeout: 0.15
+    firing_interval_ms: 125
+    noise_filtering: 1
+    field_of_view: 0.52
+    min_range: 0.02
+    max_range: 11.28
