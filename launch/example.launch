@@ -1,9 +1,0 @@
-<launch>
-
-  <node pkg="ks103-ultrasound" type="ks103" name="ultrasound" output="screen">
-
-    <rosparam file="$(find ks103-ultrasound)/launch/example.yml" command="load"/>
-
-  </node>
-
-</launch>
