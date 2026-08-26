@@ -69,3 +69,11 @@ colcon test-result --verbose
 ```
 
 The tests inject a mock `IKs103Bus`; no physical I2C hardware is accessed.
+
+## RS485 transports
+
+Set `transport` to `rs485_usb` or `rs485_uart`. Both use the shared `Ks103Rs485Protocol`: an exact `[address][0x02][command]` request and two-byte `[HIGH][LOW]` response, without Modbus CRC. Addresses are raw 8-bit values from `0xD0` through `0xFE`, excluding `0xF0`, `0xF2`, `0xF4`, and `0xF6`. `rs485_uart` requires kernel `TIOCSRS485` support; USB adapters are expected to provide automatic direction control.
+
+The default RS485 command is `0xB0`; Linux I2C retains its existing `0xBC` conversion behavior. Serial bytes are written separately with configurable `command_byte_delay_us` (20–100 us, default 50). The driver flushes stale input and permits only one outstanding transaction. Timing telemetry is published on `diagnostics`; `Range.header.stamp` is captured independently after each complete response.
+
+Real USB/UART bus timing has **NOT VERIFIED** status until tested on the target hardware.

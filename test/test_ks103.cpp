@@ -1,9 +1,59 @@
 #include "ks103_ultrasound/ks103_node.hpp"
+#include "ks103_ultrasound/ks103_rs485_protocol.hpp"
+#include "ks103_ultrasound/ks103_serial_transport.hpp"
 #include <gtest/gtest.h>
 #include <deque>
 
 using namespace std::chrono_literals;
 namespace ks103_ultrasound {
+class FakeSerial final : public ISerialIo {
+public:
+  bool discard_input() override { ++flushes; return flush_ok; }
+  bool write_byte(uint8_t value) override { writes.push_back(value); return true; }
+  int read_some(uint8_t *data, size_t size, std::chrono::steady_clock::time_point) override {
+    if (chunks.empty()) return 0;
+    auto chunk = chunks.front(); chunks.pop_front();
+    if (chunk.empty()) return 0;
+    const auto count = std::min(size, chunk.size());
+    std::copy_n(chunk.begin(), count, data); return static_cast<int>(count);
+  }
+  void close() override { closed = true; }
+  std::vector<uint8_t> writes; std::deque<std::vector<uint8_t>> chunks;
+  int flushes{0}; bool flush_ok{true}, closed{false};
+};
+
+TEST(Ks103Protocol, GoldenVectorAddressesCommandsAndUnits) {
+  EXPECT_EQ(Ks103Rs485Protocol::build_measurement_request(0xE8),
+    (std::array<uint8_t, 3>{0xE8, 0x02, 0xB0}));
+  EXPECT_FALSE(Ks103Rs485Protocol::valid_address(0xCF));
+  for (const auto excluded : {0xF0, 0xF2, 0xF4, 0xF6})
+    EXPECT_FALSE(Ks103Rs485Protocol::valid_address(excluded));
+  EXPECT_EQ(Ks103Rs485Protocol::parse_measurement_response(0xB0, 0x12, 0x34).raw, 0x1234);
+  EXPECT_EQ(Ks103Rs485Protocol::result_unit(0xB4), Ks103ResultUnit::MILLIMETRES);
+  EXPECT_EQ(Ks103Rs485Protocol::result_unit(0x2F), Ks103ResultUnit::MICROSECONDS);
+  EXPECT_EQ(Ks103Rs485Protocol::result_unit(0xBA), Ks103ResultUnit::MICROSECONDS);
+  EXPECT_THROW(Ks103Rs485Protocol::build_measurement_request(0xE8, 0xB1), std::invalid_argument);
+}
+
+TEST(Ks103Serial, PartialZeroByteCompleteTimeoutAndByteDelay) {
+  auto serial = std::make_shared<FakeSerial>();
+  serial->chunks = {{}, {0x04}, {0xD2}};
+  std::vector<std::chrono::microseconds> delays;
+  Ks103Rs485Transport transport(serial, 0xB0, 50,
+    [&](auto delay) { delays.push_back(delay); });
+  EXPECT_EQ(transport.measure_mm(0xD0, 5ms), 1234);
+  EXPECT_EQ(serial->writes, (std::vector<uint8_t>{0xD0, 0x02, 0xB0}));
+  EXPECT_EQ(delays, (std::vector<std::chrono::microseconds>{50us, 50us}));
+  EXPECT_EQ(serial->flushes, 1);
+  EXPECT_EQ(transport.measure_mm(0xD2, 0ms), std::nullopt);
+  EXPECT_THROW(Ks103Rs485Transport(serial, 0xB0, 19), std::invalid_argument);
+}
+
+TEST(Ks103Serial, TravelTimeCommandIsNotMisreportedAsMillimetres) {
+  auto serial = std::make_shared<FakeSerial>(); serial->chunks = {{0x00, 0x64}};
+  Ks103Rs485Transport transport(serial, 0xB2, 50, [](auto) {});
+  EXPECT_EQ(transport.measure_mm(0xD0, 5ms), std::nullopt);
+}
 class MockBus final : public IKs103Bus {
 public:
   bool configure_noise_filter(uint8_t address, uint8_t) override { configured.push_back(address); return true; }

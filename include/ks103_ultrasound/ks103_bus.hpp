@@ -17,6 +17,8 @@ public:
   virtual void close() = 0;
 };
 
+using IKs103Transport = IKs103Bus;
+
 class Ks103I2cBus final : public IKs103Bus {
 public:
   explicit Ks103I2cBus(const std::string &device);

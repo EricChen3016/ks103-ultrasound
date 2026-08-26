@@ -8,12 +8,14 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 
-add_library(ks103_driver src/ks103_bus.cpp src/ks103_node.cpp)
+add_library(ks103_driver src/ks103_bus.cpp src/ks103_node.cpp
+  src/ks103_rs485_protocol.cpp src/ks103_serial_transport.cpp)
 target_include_directories(ks103_driver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(ks103_driver rclcpp sensor_msgs)
+ament_target_dependencies(ks103_driver rclcpp sensor_msgs diagnostic_msgs)
 
 add_executable(ks103_node src/main.cpp)
 target_link_libraries(ks103_node ks103_driver)
@@ -30,9 +32,9 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_ks103 test/test_ks103.cpp)
   target_link_libraries(test_ks103 ks103_driver)
-  ament_target_dependencies(test_ks103 rclcpp sensor_msgs)
+  ament_target_dependencies(test_ks103 rclcpp sensor_msgs diagnostic_msgs)
 endif()
 
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp sensor_msgs)
+ament_export_dependencies(rclcpp sensor_msgs diagnostic_msgs)
 ament_package()
